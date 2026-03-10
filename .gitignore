@@ -1,0 +1,4 @@
+#  Derleme Dosyaları
+CMakeLists.txt.user
+build/
+dist/
