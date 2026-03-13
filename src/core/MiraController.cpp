@@ -1,22 +1,15 @@
 #include "MiraController.h"
 #include "../config/ConfigManager.h"
+#include <QDebug>
 
-MiraController::MiraController(QObject *parent)
-    : QObject(parent)
-{
+MiraController::MiraController(QObject *parent) : QObject(parent) {
+    // ÇOK ÖNEMLİ: Kendi oluşturduğumuz struct tipini Qt'ye kaydediyoruz
+    qRegisterMetaType<TelemetryData>("TelemetryData");
+
     m_telemetryClient = new TelemetryClient(this);
 
-    connect(m_telemetryClient, &TelemetryClient::ebiDataReceived, this, &MiraController::handleEbiData);
-    connect(m_telemetryClient, &TelemetryClient::permittedDataReceived, this, &MiraController::handlePermittedData);
-    connect(m_telemetryClient, &TelemetryClient::warningDataReceived, this, &MiraController::handleWarningData);
-    connect(m_telemetryClient, &TelemetryClient::sbi1DataReceived, this, &MiraController::handleSbi1Data);
-    connect(m_telemetryClient, &TelemetryClient::sbi2DataReceived, this, &MiraController::handleSbi2Data);
-    connect(m_telemetryClient, &TelemetryClient::indicationDataReceived, this, &MiraController::handleIndicationData);
-    connect(m_telemetryClient, &TelemetryClient::eoaTargetReceived, this, &MiraController::handleEoaData);
-    connect(m_telemetryClient, &TelemetryClient::svlTargetReceived, this, &MiraController::handleSvlData);
-
-    // YENİ BAĞLANTI: Sıfırlama sinyalini bağla
-    connect(m_telemetryClient, &TelemetryClient::curveResetTriggered, this, &MiraController::clearAllSeries);
+    // Tek bir sinyali bağlıyoruz
+    connect(m_telemetryClient, &TelemetryClient::telemetryReceived, this, &MiraController::handleTelemetryData);
 }
 
 void MiraController::startSystem() {
@@ -25,6 +18,7 @@ void MiraController::startSystem() {
     m_telemetryClient->connectToServer(ip, port);
 }
 
+// QML Setter Fonksiyonları...
 void MiraController::setEbiSeries(QXYSeries* series) { m_ebiSeries = series; }
 void MiraController::setPermittedSeries(QXYSeries* series) { m_permittedSeries = series; }
 void MiraController::setWarningSeries(QXYSeries* series) { m_warningSeries = series; }
@@ -34,7 +28,6 @@ void MiraController::setIndicationSeries(QXYSeries* series) { m_indicationSeries
 void MiraController::setEoaSeries(QXYSeries* series) { m_eoaSeries = series; }
 void MiraController::setSvlSeries(QXYSeries* series) { m_svlSeries = series; }
 
-// YENİ FONKSİYON: Tüm serileri temizler (Grafik sıfırlanır)
 void MiraController::clearAllSeries() {
     if (m_ebiSeries) m_ebiSeries->clear();
     if (m_permittedSeries) m_permittedSeries->clear();
@@ -46,11 +39,27 @@ void MiraController::clearAllSeries() {
     if (m_svlSeries) m_svlSeries->clear();
 }
 
-void MiraController::handleEbiData(double distance, double speed) { if (m_ebiSeries) m_ebiSeries->append(distance, speed); }
-void MiraController::handlePermittedData(double distance, double speed) { if (m_permittedSeries) m_permittedSeries->append(distance, speed); }
-void MiraController::handleWarningData(double distance, double speed) { if (m_warningSeries) m_warningSeries->append(distance, speed); }
-void MiraController::handleSbi1Data(double distance, double speed) { if (m_sbi1Series) m_sbi1Series->append(distance, speed); }
-void MiraController::handleSbi2Data(double distance, double speed) { if (m_sbi2Series) m_sbi2Series->append(distance, speed); }
-void MiraController::handleIndicationData(double distance, double speed) { if (m_indicationSeries) m_indicationSeries->append(distance, speed); }
-void MiraController::handleEoaData(double distance, double speed) { if (m_eoaSeries) m_eoaSeries->append(distance, speed); }
-void MiraController::handleSvlData(double distance, double speed) { if (m_svlSeries) m_svlSeries->append(distance, speed); }
+// YENİ: Struct paketi buraya düşer ve ekran güncellenir
+void MiraController::handleTelemetryData(TelemetryData data) {
+
+    if (data.hasCurves) {
+        // Yeni Yetki (Movement Authority) Sıfırlama Kontrolü
+        if (m_lastDistanceToTarget != -1.0 && data.dEbi > (m_lastDistanceToTarget + 10.0)) {
+            qDebug() << "Grafik Sifirlaniyor! Mesafe sictamasi:" << m_lastDistanceToTarget << "->\n" << data.dEbi;
+            clearAllSeries();
+        }
+        m_lastDistanceToTarget = data.dEbi;
+
+        // Eğrileri struct'tan okuyup grafiğe ekliyoruz
+        if (m_ebiSeries) m_ebiSeries->append(data.dEbi, data.vEbi);
+        if (m_permittedSeries) m_permittedSeries->append(data.dPermitted, data.vPermitted);
+        if (m_warningSeries) m_warningSeries->append(data.dWarning, data.vWarning);
+        if (m_sbi1Series) m_sbi1Series->append(data.dSbi1, data.vSbi);
+        if (m_sbi2Series) m_sbi2Series->append(data.dSbi2, data.vSbi);
+        if (m_indicationSeries) m_indicationSeries->append(data.dIndication, data.v_est_kmh); // Y ekseni olarak v_est kullanıyoruz
+    }
+
+    // Hedef noktalarını struct'tan okuyup grafiğe ekliyoruz
+    if (data.hasEoa && m_eoaSeries) m_eoaSeries->append(data.dEoa, data.v_est_kmh);
+    if (data.hasSvl && m_svlSeries) m_svlSeries->append(data.dSvl, data.v_est_kmh);
+}

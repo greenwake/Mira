@@ -1,7 +1,7 @@
 #pragma once
 #include <QObject>
 #include <QtCharts/QXYSeries>
-#include "../network/TelemetryClient.h"
+#include "../network/TelemetryClient.h" // Struct'ı kullanabilmek için
 
 class MiraController : public QObject {
     Q_OBJECT
@@ -19,20 +19,16 @@ public:
     Q_INVOKABLE void setSvlSeries(QXYSeries* series);
 
 private slots:
-    void handleEbiData(double d, double v);
-    void handlePermittedData(double d, double v);
-    void handleWarningData(double d, double v);
-    void handleSbi1Data(double d, double v);
-    void handleSbi2Data(double d, double v);
-    void handleIndicationData(double d, double v);
-    void handleEoaData(double d, double v);
-    void handleSvlData(double d, double v);
-
-    // YENİ: Temizleme slotu
+    // YENİ: Paketi tek seferde alan ve işleyen slot
+    void handleTelemetryData(TelemetryData data);
     void clearAllSeries();
 
 private:
     TelemetryClient* m_telemetryClient;
+
+    // YENİ: Zıplama/Sıfırlama kontrolünü artık Controller yapacak
+    double m_lastDistanceToTarget = -1.0;
+
     QXYSeries* m_ebiSeries = nullptr;
     QXYSeries* m_permittedSeries = nullptr;
     QXYSeries* m_warningSeries = nullptr;

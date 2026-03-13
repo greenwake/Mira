@@ -3,10 +3,7 @@
 #include <QJsonObject>
 #include <QDebug>
 
-// Constructor içinde m_lastDistanceToTarget başlangıç değeri -1 yapıldı
-TelemetryClient::TelemetryClient(QObject *parent)
-    : QObject(parent), m_lastDistanceToTarget(-1.0)
-{
+TelemetryClient::TelemetryClient(QObject *parent) : QObject(parent) {
     m_socket = new QTcpSocket(this);
     m_reconnectTimer = new QTimer(this);
 
@@ -14,7 +11,6 @@ TelemetryClient::TelemetryClient(QObject *parent)
     connect(m_socket, &QTcpSocket::connected, this, &TelemetryClient::onConnected);
     connect(m_socket, &QTcpSocket::disconnected, this, &TelemetryClient::onDisconnected);
     connect(m_socket, &QTcpSocket::errorOccurred, this, &TelemetryClient::onErrorOccurred);
-
     connect(m_reconnectTimer, &QTimer::timeout, this, &TelemetryClient::attemptReconnect);
 }
 
@@ -26,14 +22,12 @@ void TelemetryClient::connectToServer(const QString& ip, quint16 port) {
 
 void TelemetryClient::attemptReconnect() {
     if (m_socket->state() != QAbstractSocket::ConnectedState && m_socket->state() != QAbstractSocket::ConnectingState) {
-        qDebug() << "Sunucuya baglanilmaya calisiliyor:" << m_serverIp << ":" << m_serverPort;
         m_socket->connectToHost(m_serverIp, m_serverPort);
     }
 }
 
 void TelemetryClient::onConnected() {
     qDebug() << "Sunucuya basariyla baglanildi!";
-    m_lastDistanceToTarget = -1.0; // Bağlantı yenilendiğinde mesafeyi sıfırla
     m_reconnectTimer->stop();
 }
 
@@ -43,10 +37,7 @@ void TelemetryClient::onDisconnected() {
 }
 
 void TelemetryClient::onErrorOccurred(QAbstractSocket::SocketError socketError) {
-    qDebug() << "Soket Hatasi:" << socketError;
-    if (!m_reconnectTimer->isActive()) {
-        m_reconnectTimer->start(3000);
-    }
+    if (!m_reconnectTimer->isActive()) m_reconnectTimer->start(3000);
 }
 
 void TelemetryClient::onReadyRead() {
@@ -66,59 +57,49 @@ void TelemetryClient::onReadyRead() {
         if (root.contains("monitoring")) {
             QJsonObject monitoring = root["monitoring"].toObject();
 
-            double v_est_kmh = 0;
+            // HER DÖNGÜDE YENİ BİR STRUCT OLUŞTURUYORUZ
+            TelemetryData tData;
+
             if (monitoring.contains("odometer")) {
-                v_est_kmh = (monitoring["odometer"].toObject()["v_est"].toDouble() / 100.0) * 3.6;
+                tData.v_est_kmh = (monitoring["odometer"].toObject()["v_est"].toDouble() / 100.0) * 3.6;
             }
 
             if (monitoring.contains("speedAndDistance")) {
                 QJsonObject sAndD = monitoring["speedAndDistance"].toObject();
+                tData.hasCurves = true;
 
-                // YENİ EĞRİ KONTROLÜ (MA Uzatması / Yeni Hedef)
-                if (sAndD.contains("dEbi")) {
-                    double currentDistance_m = sAndD["dEbi"].toDouble() / 100.0;
+                // Struct içini dolduruyoruz
+                if (sAndD.contains("dEbi")) tData.dEbi = sAndD["dEbi"].toDouble() / 100.0;
+                if (sAndD.contains("vEbi")) tData.vEbi = (sAndD["vEbi"].toDouble() / 100.0) * 3.6;
 
-                    // Eğer yeni mesafe, eskisinden 10 metreden daha fazlaysa (tren geriye gitmeyeceğine göre yeni eğri gelmiştir)
-                    if (m_lastDistanceToTarget != -1.0 && currentDistance_m > (m_lastDistanceToTarget + 10.0)) {
-                        qDebug() << "Yeni Fren Egrisi Algilandi! Mesafe sictamasi:" << m_lastDistanceToTarget << "->\n" << currentDistance_m;
-                        emit curveResetTriggered(); // Controller'a sıfırla komutu ver
-                    }
-                    m_lastDistanceToTarget = currentDistance_m; // Yeni değeri hafızaya al
-                }
+                if (sAndD.contains("dPermitted")) tData.dPermitted = sAndD["dPermitted"].toDouble() / 100.0;
+                if (sAndD.contains("vPermitted")) tData.vPermitted = (sAndD["vPermitted"].toDouble() / 100.0) * 3.6;
 
-                auto emitCurve = [&](const QString& dKey, const QString& vKey, void (TelemetryClient::*signal)(double, double)) {
-                    if (sAndD.contains(dKey) && sAndD.contains(vKey)) {
-                        double d_m = sAndD[dKey].toDouble() / 100.0;
-                        double v_kmh = (sAndD[vKey].toDouble() / 100.0) * 3.6;
-                        emit (this->*signal)(d_m, v_kmh);
-                    }
-                };
+                if (sAndD.contains("dWarning")) tData.dWarning = sAndD["dWarning"].toDouble() / 100.0;
+                if (sAndD.contains("vWarning")) tData.vWarning = (sAndD["vWarning"].toDouble() / 100.0) * 3.6;
 
-                emitCurve("dEbi", "vEbi", &TelemetryClient::ebiDataReceived);
-                emitCurve("dPermitted", "vPermitted", &TelemetryClient::permittedDataReceived);
-                emitCurve("dWarning", "vWarning", &TelemetryClient::warningDataReceived);
-                emitCurve("dSbi1", "vSbi", &TelemetryClient::sbi1DataReceived);
-                emitCurve("dSbi2", "vSbi", &TelemetryClient::sbi2DataReceived);
+                if (sAndD.contains("dSbi1")) tData.dSbi1 = sAndD["dSbi1"].toDouble() / 100.0;
+                if (sAndD.contains("dSbi2")) tData.dSbi2 = sAndD["dSbi2"].toDouble() / 100.0;
+                if (sAndD.contains("vSbi")) tData.vSbi = (sAndD["vSbi"].toDouble() / 100.0) * 3.6;
 
-                if (sAndD.contains("dIndication")) {
-                    double dIndication_m = sAndD["dIndication"].toDouble() / 100.0;
-                    emit indicationDataReceived(dIndication_m, v_est_kmh);
-                }
+                if (sAndD.contains("dIndication")) tData.dIndication = sAndD["dIndication"].toDouble() / 100.0;
             }
 
             if (monitoring.contains("trainPosition")) {
                 QJsonObject tp = monitoring["trainPosition"].toObject();
 
                 if (tp.contains("solr_ref")) {
-                    double solr_d = tp["solr_ref"].toObject()["d_est_front_end"].toDouble() / 100.0;
-                    emit eoaTargetReceived(solr_d, v_est_kmh);
+                    tData.hasEoa = true;
+                    tData.dEoa = tp["solr_ref"].toObject()["d_est_front_end"].toDouble() / 100.0;
                 }
-
                 if (tp.contains("max_safe_front_end")) {
-                    double max_safe_d = tp["max_safe_front_end"].toDouble() / 100.0;
-                    emit svlTargetReceived(max_safe_d, v_est_kmh);
+                    tData.hasSvl = true;
+                    tData.dSvl = tp["max_safe_front_end"].toDouble() / 100.0;
                 }
             }
+
+            // STRUCT DOLDU! Şimdi tek seferde paketi fırlatıyoruz.
+            emit telemetryReceived(tData);
         }
     }
 }

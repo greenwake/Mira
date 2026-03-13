@@ -2,6 +2,31 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QTimer>
+#include <QMetaType> // Struct'ı Qt'ye tanıtmak için gerekli
+
+// YENİ: Veri Taşıma Objesi (DTO)
+struct TelemetryData {
+    double v_est_kmh = 0.0;
+
+    // Eğri Verileri (Mesafe ve Hız)
+    bool hasCurves = false;
+    double dEbi = 0.0, vEbi = 0.0;
+    double dPermitted = 0.0, vPermitted = 0.0;
+    double dWarning = 0.0, vWarning = 0.0;
+    double dSbi1 = 0.0, vSbi = 0.0;
+    double dSbi2 = 0.0;
+    double dIndication = 0.0;
+
+    // Hedef Verileri
+    bool hasEoa = false;
+    double dEoa = 0.0;
+
+    bool hasSvl = false;
+    double dSvl = 0.0;
+};
+
+// Struct'ı Qt sinyal sistemine kaydediyoruz
+Q_DECLARE_METATYPE(TelemetryData)
 
 class TelemetryClient : public QObject {
     Q_OBJECT
@@ -10,18 +35,8 @@ public:
     void connectToServer(const QString& ip, quint16 port);
 
 signals:
-    void ebiDataReceived(double distance, double speed);
-    void permittedDataReceived(double distance, double speed);
-    void warningDataReceived(double distance, double speed);
-    void sbi1DataReceived(double distance, double speed);
-    void sbi2DataReceived(double distance, double speed);
-    void indicationDataReceived(double distance, double speed);
-
-    void eoaTargetReceived(double x_pos, double y_speed);
-    void svlTargetReceived(double x_pos, double y_speed);
-
-    // YENİ: Grafiği sıfırlama sinyali
-    void curveResetTriggered();
+    // ARTIK TEK BİR SİNYALİMİZ VAR: Tüm paketi tek seferde gönderir
+    void telemetryReceived(TelemetryData data);
 
 private slots:
     void onReadyRead();
@@ -36,7 +51,4 @@ private:
     QTimer* m_reconnectTimer;
     QString m_serverIp;
     quint16 m_serverPort;
-
-    // YENİ: Bir önceki mesafeyi tutacağımız değişken
-    double m_lastDistanceToTarget;
 };
