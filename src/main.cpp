@@ -1,11 +1,15 @@
-#include <QApplication> // QGuiApplication yerine QApplication eklendi
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+// QQuickStyle kütüphanesini sildik
 #include "MiraController.h"
 #include "ConfigManager.h"
 
 int main(int argc, char *argv[])
 {
+    // QML'deki özelleştirme uyarılarını engellemek için Basic stilini çevre değişkeni ile zorluyoruz
+    qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
+
     // Qt Charts QML eklentisi QApplication gerektirir!
     QApplication app(argc, argv);
 

@@ -16,6 +16,9 @@ Window {
         // QML yüklendiğinde serileri C++ tarafına bağla ve sistemi başlat
         MiraController.setEbiSeries(ebiLine);
         MiraController.setPermittedSeries(permittedLine);
+        MiraController.setWarningSeries(warningLine);
+        MiraController.setSbi1Series(sbi1Line);
+        MiraController.setSbi2Series(sbi2Line);
         MiraController.startSystem();
     }
 
@@ -95,18 +98,38 @@ Window {
                 LineSeries {
                     id: ebiLine
                     name: "EBI"
-                    axisX: axisX
-                    axisY: axisY
-                    color: "#0055ff" // Canlı Mavi
+                    axisX: axisX; axisY: axisY
+                    color: "#00008B" // Koyu Mavi
                     width: 3
                 }
-
+                LineSeries {
+                    id: sbi1Line
+                    name: "SBI 1"
+                    axisX: axisX; axisY: axisY
+                    color: "#32CD32" // Yeşil
+                    style: Qt.DashLine // Kesik Çizgi
+                    width: 2
+                }
+                LineSeries {
+                    id: sbi2Line
+                    name: "SBI 2"
+                    axisX: axisX; axisY: axisY
+                    color: "#4169E1" // Açık Mavi
+                    style: Qt.DashLine // Kesik Çizgi
+                    width: 2
+                }
+                LineSeries {
+                    id: warningLine
+                    name: "Warning"
+                    axisX: axisX; axisY: axisY
+                    color: "#FFD700" // Sarı
+                    width: 3
+                }
                 LineSeries {
                     id: permittedLine
                     name: "Permitted"
-                    axisX: axisX
-                    axisY: axisY
-                    color: "#a0a0a0" // Açık Gri
+                    axisX: axisX; axisY: axisY
+                    color: "#A9A9A9" // Gri
                     width: 3
                 }
             }
@@ -134,6 +157,27 @@ Window {
                     checked: true
                     contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
                     onCheckedChanged: ebiLine.visible = checked
+                }
+
+                CheckBox {
+                    text: "SBI 1"
+                    checked: true
+                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
+                    onCheckedChanged: sbi1Line.visible = checked
+                }
+
+                CheckBox {
+                    text: "SBI 2"
+                    checked: true
+                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
+                    onCheckedChanged: sbi2Line.visible = checked
+                }
+
+                CheckBox {
+                    text: "Warning"
+                    checked: true
+                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
+                    onCheckedChanged: warningLine.visible = checked
                 }
 
                 CheckBox {

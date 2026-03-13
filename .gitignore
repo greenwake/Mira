@@ -1,4 +1,5 @@
 #  Derleme Dosyaları
 CMakeLists.txt.user
 build/
+build_linux/
 dist/

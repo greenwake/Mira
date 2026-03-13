@@ -3,85 +3,120 @@
 #include <QJsonObject>
 #include <QDebug>
 
-TelemetryClient::TelemetryClient(QObject *parent) : QObject(parent) {
+// Constructor içinde m_lastDistanceToTarget başlangıç değeri -1 yapıldı
+TelemetryClient::TelemetryClient(QObject *parent)
+    : QObject(parent), m_lastDistanceToTarget(-1.0)
+{
     m_socket = new QTcpSocket(this);
+    m_reconnectTimer = new QTimer(this);
+
     connect(m_socket, &QTcpSocket::readyRead, this, &TelemetryClient::onReadyRead);
     connect(m_socket, &QTcpSocket::connected, this, &TelemetryClient::onConnected);
+    connect(m_socket, &QTcpSocket::disconnected, this, &TelemetryClient::onDisconnected);
     connect(m_socket, &QTcpSocket::errorOccurred, this, &TelemetryClient::onErrorOccurred);
+
+    connect(m_reconnectTimer, &QTimer::timeout, this, &TelemetryClient::attemptReconnect);
 }
 
 void TelemetryClient::connectToServer(const QString& ip, quint16 port) {
-    qDebug() << "Baglaniliyor:" << ip << ":" << port;
-    m_socket->connectToHost(ip, port);
+    m_serverIp = ip;
+    m_serverPort = port;
+    attemptReconnect();
+}
+
+void TelemetryClient::attemptReconnect() {
+    if (m_socket->state() != QAbstractSocket::ConnectedState && m_socket->state() != QAbstractSocket::ConnectingState) {
+        qDebug() << "Sunucuya baglanilmaya calisiliyor:" << m_serverIp << ":" << m_serverPort;
+        m_socket->connectToHost(m_serverIp, m_serverPort);
+    }
 }
 
 void TelemetryClient::onConnected() {
-    qDebug() << "Sunucuya baglanildi!";
+    qDebug() << "Sunucuya basariyla baglanildi!";
+    m_lastDistanceToTarget = -1.0; // Bağlantı yenilendiğinde mesafeyi sıfırla
+    m_reconnectTimer->stop();
+}
+
+void TelemetryClient::onDisconnected() {
+    qDebug() << "Sunucu ile baglanti koptu. Yeniden baglanma bekleniyor...";
+    m_reconnectTimer->start(3000);
 }
 
 void TelemetryClient::onErrorOccurred(QAbstractSocket::SocketError socketError) {
     qDebug() << "Soket Hatasi:" << socketError;
-}
-
-void TelemetryClient::onReadyRead2() {
-    QByteArray data = m_socket->readAll();
-    qDebug() << "QByteArray:" << data;
-    QJsonParseError parseError;
-    QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
-
-    if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-        QJsonObject root = doc.object();
-        
-        if (root.contains("speedAndDistance")) {
-            QJsonObject sAndD = root["speedAndDistance"].toObject();
-            
-            // Verisetinden gerekli alanlari cekiyoruz
-            if (sAndD.contains("dEbi") && sAndD.contains("vEbi")) {
-                emit ebiDataReceived(sAndD["dEbi"].toDouble(), sAndD["vEbi"].toDouble()); // [cite: 1, 2]
-            }
-            
-            if (sAndD.contains("dPermitted") && sAndD.contains("vPermitted")) {
-                emit permittedDataReceived(sAndD["dPermitted"].toDouble(), sAndD["vPermitted"].toDouble()); // [cite: 1, 2]
-            }
-        }
+    if (!m_reconnectTimer->isActive()) {
+        m_reconnectTimer->start(3000);
     }
 }
 
 void TelemetryClient::onReadyRead() {
-    // Mock server'dan satır satır (\n) okuyoruz
-    while (m_socket->canReadLine()) {
-        QByteArray data = m_socket->readLine();
+    m_buffer.append(m_socket->readAll());
+
+    while (m_buffer.contains("##")) {
+        int separatorIndex = m_buffer.indexOf("##");
+        QByteArray rawData = m_buffer.left(separatorIndex);
+        m_buffer.remove(0, separatorIndex + 2);
+
         QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+        QJsonDocument doc = QJsonDocument::fromJson(rawData, &parseError);
+        if (parseError.error != QJsonParseError::NoError) continue;
 
-        if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-            QJsonObject root = doc.object();
+        QJsonObject root = doc.object();
 
-            if (root.contains("speedAndDistance")) {
-                QJsonObject sAndD = root["speedAndDistance"].toObject();
+        if (root.contains("monitoring")) {
+            QJsonObject monitoring = root["monitoring"].toObject();
 
-                // === EBI VERİSİ ===
-                if (sAndD.contains("dEbi") && sAndD.contains("vEbi")) {
-                    double dEbi_cm = sAndD["dEbi"].toDouble();
-                    double vEbi_cms = sAndD["vEbi"].toDouble();
+            double v_est_kmh = 0;
+            if (monitoring.contains("odometer")) {
+                v_est_kmh = (monitoring["odometer"].toObject()["v_est"].toDouble() / 100.0) * 3.6;
+            }
 
-                    // Dönüşümler: cm -> Metre, cm/s -> km/h
-                    double dEbi_m = dEbi_cm / 100.0;
-                    double vEbi_kmh = (vEbi_cms / 100.0) * 3.6;
+            if (monitoring.contains("speedAndDistance")) {
+                QJsonObject sAndD = monitoring["speedAndDistance"].toObject();
 
-                    emit ebiDataReceived(dEbi_m, vEbi_kmh);
+                // YENİ EĞRİ KONTROLÜ (MA Uzatması / Yeni Hedef)
+                if (sAndD.contains("dEbi")) {
+                    double currentDistance_m = sAndD["dEbi"].toDouble() / 100.0;
+
+                    // Eğer yeni mesafe, eskisinden 10 metreden daha fazlaysa (tren geriye gitmeyeceğine göre yeni eğri gelmiştir)
+                    if (m_lastDistanceToTarget != -1.0 && currentDistance_m > (m_lastDistanceToTarget + 10.0)) {
+                        qDebug() << "Yeni Fren Egrisi Algilandi! Mesafe sictamasi:" << m_lastDistanceToTarget << "->\n" << currentDistance_m;
+                        emit curveResetTriggered(); // Controller'a sıfırla komutu ver
+                    }
+                    m_lastDistanceToTarget = currentDistance_m; // Yeni değeri hafızaya al
                 }
 
-                // === PERMITTED VERİSİ ===
-                if (sAndD.contains("dPermitted") && sAndD.contains("vPermitted")) {
-                    double dPermitted_cm = sAndD["dPermitted"].toDouble();
-                    double vPermitted_cms = sAndD["vPermitted"].toDouble();
+                auto emitCurve = [&](const QString& dKey, const QString& vKey, void (TelemetryClient::*signal)(double, double)) {
+                    if (sAndD.contains(dKey) && sAndD.contains(vKey)) {
+                        double d_m = sAndD[dKey].toDouble() / 100.0;
+                        double v_kmh = (sAndD[vKey].toDouble() / 100.0) * 3.6;
+                        emit (this->*signal)(d_m, v_kmh);
+                    }
+                };
 
-                    // Dönüşümler: cm -> Metre, cm/s -> km/h
-                    double dPermitted_m = dPermitted_cm / 100.0;
-                    double vPermitted_kmh = (vPermitted_cms / 100.0) * 3.6;
+                emitCurve("dEbi", "vEbi", &TelemetryClient::ebiDataReceived);
+                emitCurve("dPermitted", "vPermitted", &TelemetryClient::permittedDataReceived);
+                emitCurve("dWarning", "vWarning", &TelemetryClient::warningDataReceived);
+                emitCurve("dSbi1", "vSbi", &TelemetryClient::sbi1DataReceived);
+                emitCurve("dSbi2", "vSbi", &TelemetryClient::sbi2DataReceived);
 
-                    emit permittedDataReceived(dPermitted_m, vPermitted_kmh);
+                if (sAndD.contains("dIndication")) {
+                    double dIndication_m = sAndD["dIndication"].toDouble() / 100.0;
+                    emit indicationDataReceived(dIndication_m, v_est_kmh);
+                }
+            }
+
+            if (monitoring.contains("trainPosition")) {
+                QJsonObject tp = monitoring["trainPosition"].toObject();
+
+                if (tp.contains("solr_ref")) {
+                    double solr_d = tp["solr_ref"].toObject()["d_est_front_end"].toDouble() / 100.0;
+                    emit eoaTargetReceived(solr_d, v_est_kmh);
+                }
+
+                if (tp.contains("max_safe_front_end")) {
+                    double max_safe_d = tp["max_safe_front_end"].toDouble() / 100.0;
+                    emit svlTargetReceived(max_safe_d, v_est_kmh);
                 }
             }
         }

@@ -4,26 +4,42 @@ import time
 import math
 
 HOST = '127.0.0.1'
-PORT = 5000
+PORT = 26001
 
 def generate_telemetry(distance_cm):
-    # Fren eğrisi simülasyonu (Birimler: cm ve cm/s)
     if distance_cm > 0:
-        # 1.000.000 cm'de (10km) hız yaklaşık 7000 cm/s (252 km/h) olacak
-        speed_ebi_cms = math.sqrt(distance_cm) * 7.0 
-        
-        # Permitted hızı EBI'den yaklaşık 5 m/s (500 cm/s) daha düşük olsun
-        speed_permitted_cms = max(0, speed_ebi_cms - 500)
+        base_speed_cms = math.sqrt(distance_cm) * 8.0
+        v_est = base_speed_cms * 0.9 
     else:
-        speed_ebi_cms = 0
-        speed_permitted_cms = 0
+        base_speed_cms = 0
+        v_est = 0
 
     return {
-        "speedAndDistance": {
-            "dEbi": int(distance_cm),
-            "vEbi": int(speed_ebi_cms),
-            "dPermitted": int(distance_cm),
-            "vPermitted": int(speed_permitted_cms)
+        "monitoring": {
+            "odometer": {
+                "v_est": int(v_est),
+                "v_max": 20000,
+                "timestamp": int(time.time())
+            },
+            "speedAndDistance": {
+                "dEbi": int(distance_cm),
+                "vEbi": int(base_speed_cms),
+                "dSbi1": int(distance_cm - 5000),
+                "dSbi2": int(distance_cm - 10000),
+                "vSbi": int(base_speed_cms * 0.95),
+                "dWarning": int(distance_cm),
+                "vWarning": int(base_speed_cms * 0.90),
+                "dPermitted": int(distance_cm),
+                "vPermitted": int(base_speed_cms * 0.85),
+                "dIndication": int(distance_cm + 2000)
+            },
+            "trainPosition": {
+                "max_safe_front_end": int(distance_cm + 5000), 
+                "solr_ref": {
+                    "d_est_front_end": int(distance_cm), 
+                    "is_valid": True
+                }
+            }
         }
     }
 
@@ -32,31 +48,33 @@ def start_server():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen()
-        print(f"Mock Server dinliyor: {HOST}:{PORT}")
-        print("Mira uygulamasının bağlanması bekleniyor...")
+        print(f"Mock Server {PORT} portunda dinliyor...")
         
-        conn, addr = s.accept()
-        with conn:
+        while True: 
+            conn, addr = s.accept()
             print(f"Bağlantı sağlandı: {addr}")
-            
-            # 10 Kilometre = 1.000.000 Santimetre
-            distance_cm = 1000000.0 
-            
-            while distance_cm >= 0:
-                payload = generate_telemetry(distance_cm)
-                
-                # TCP yapışmasını önlemek için \n ekliyoruz
-                json_string = json.dumps(payload) + '\n'
-                
-                try:
-                    conn.sendall(json_string.encode('utf-8'))
-                    print(f"Mesafe: {distance_cm} cm, EBI Hız: {payload['speedAndDistance']['vEbi']} cm/s")
-                except (ConnectionResetError, BrokenPipeError):
-                    print("Mira uygulaması bağlantıyı kopardı.")
-                    break
+            with conn:
+                distance_cm = 1000000.0 
+                while distance_cm >= 0:
+                    payload = generate_telemetry(distance_cm)
+                    json_string = json.dumps(payload) + "##"
                     
-                distance_cm -= 5000.0 # Her adımda 50 metre (5000 cm) yaklaş
-                time.sleep(0.1)  # 10 Hz hızında veri bas
+                    try:
+                        conn.sendall(json_string.encode('utf-8'))
+                    except BrokenPipeError:
+                        break
+                    except Exception as e:
+                        break
+                        
+                    distance_cm -= 3000.0 
+                    
+                    # YENİ EĞRİ SİMÜLASYONU: 2KM'ye gelince hedefi 8KM'ye uzat
+                    if distance_cm < 200000.0 and distance_cm > 196000.0:
+                        print(">> YENİ YETKİ (MA) GELDİ! Eğri sıfırlanıyor...")
+                        distance_cm = 800000.0 
+                    
+                    time.sleep(0.1) 
+                print("Simülasyon bitti.")
 
 if __name__ == '__main__':
     start_server()
