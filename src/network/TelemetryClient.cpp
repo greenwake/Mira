@@ -32,7 +32,6 @@ void TelemetryClient::onConnected() {
 }
 
 void TelemetryClient::onDisconnected() {
-    qDebug() << "Sunucu ile baglanti koptu. Yeniden baglanma bekleniyor...";
     m_reconnectTimer->start(3000);
 }
 
@@ -56,49 +55,54 @@ void TelemetryClient::onReadyRead() {
 
         if (root.contains("monitoring")) {
             QJsonObject monitoring = root["monitoring"].toObject();
-
-            // HER DÖNGÜDE YENİ BİR STRUCT OLUŞTURUYORUZ
             TelemetryData tData;
 
+            double v_est = 0;
             if (monitoring.contains("odometer")) {
-                tData.v_est_kmh = (monitoring["odometer"].toObject()["v_est"].toDouble() / 100.0) * 3.6;
+                v_est = (monitoring["odometer"].toObject()["v_est"].toDouble() / 100.0) * 3.6;
+                tData.v_est_kmh = v_est;
+            }
+
+            double solr_d = 0, max_safe_d = 0;
+            if (monitoring.contains("trainPosition")) {
+                QJsonObject tp = monitoring["trainPosition"].toObject();
+                if (tp.contains("solr_ref")) solr_d = tp["solr_ref"].toObject()["d_est_front_end"].toDouble() / 100.0;
+                if (tp.contains("max_safe_front_end")) max_safe_d = tp["max_safe_front_end"].toDouble() / 100.0;
+
+                if (solr_d > 0) { tData.hasEoa = true; tData.dEoa = solr_d; }
+                if (max_safe_d > 0) { tData.hasSvl = true; tData.dSvl = max_safe_d; }
             }
 
             if (monitoring.contains("speedAndDistance")) {
                 QJsonObject sAndD = monitoring["speedAndDistance"].toObject();
                 tData.hasCurves = true;
 
-                // Struct içini dolduruyoruz
-                if (sAndD.contains("dEbi")) tData.dEbi = sAndD["dEbi"].toDouble() / 100.0;
-                if (sAndD.contains("vEbi")) tData.vEbi = (sAndD["vEbi"].toDouble() / 100.0) * 3.6;
+                auto getD = [&](const QString& k) { return sAndD.contains(k) ? sAndD[k].toDouble() / 100.0 : 0.0; };
+                auto getV = [&](const QString& k) { return sAndD.contains(k) ? (sAndD[k].toDouble() / 100.0) * 3.6 : 0.0; };
 
-                if (sAndD.contains("dPermitted")) tData.dPermitted = sAndD["dPermitted"].toDouble() / 100.0;
-                if (sAndD.contains("vPermitted")) tData.vPermitted = (sAndD["vPermitted"].toDouble() / 100.0) * 3.6;
+                double dSbi1 = getD("dSbi1"), dSbi2 = getD("dSbi2"), dEbi = getD("dEbi");
+                double dWarn = getD("dWarning"), dPerm = getD("dPermitted"), dInd = getD("dIndication");
 
-                if (sAndD.contains("dWarning")) tData.dWarning = sAndD["dWarning"].toDouble() / 100.0;
-                if (sAndD.contains("vWarning")) tData.vWarning = (sAndD["vWarning"].toDouble() / 100.0) * 3.6;
+                double vSbi = getV("vSbi"), vEbi = getV("vEbi"), vWarn = getV("vWarning"), vPerm = getV("vPermitted");
+                double vInd = getV("vIndication");
 
-                if (sAndD.contains("dSbi1")) tData.dSbi1 = sAndD["dSbi1"].toDouble() / 100.0;
-                if (sAndD.contains("dSbi2")) tData.dSbi2 = sAndD["dSbi2"].toDouble() / 100.0;
-                if (sAndD.contains("vSbi")) tData.vSbi = (sAndD["vSbi"].toDouble() / 100.0) * 3.6;
+                // X Ekseni
+                tData.x_sbi1 = (dSbi1 != 0) ? dSbi1 : ((solr_d != 0) ? solr_d : (10000.0 - max_safe_d));
+                tData.x_sbi2 = (dSbi2 != 0) ? dSbi2 : ((max_safe_d != 0) ? max_safe_d : (10000.0 - max_safe_d));
+                tData.x_ebi = (dEbi != 0) ? dEbi : ((max_safe_d != 0) ? max_safe_d : (10000.0 - max_safe_d));
+                tData.x_warning = (dWarn != 0) ? dWarn : ((max_safe_d != 0) ? max_safe_d : (10000.0 - max_safe_d));
+                tData.x_permitted = (dPerm != 0) ? dPerm : ((max_safe_d != 0) ? max_safe_d : (10000.0 - max_safe_d));
+                tData.x_indication = (dInd != 0) ? dInd : ((max_safe_d != 0) ? max_safe_d : (10000.0 - max_safe_d));
 
-                if (sAndD.contains("dIndication")) tData.dIndication = sAndD["dIndication"].toDouble() / 100.0;
+                // Y Ekseni
+                tData.y_sbi1 = (vSbi != 0) ? vSbi : v_est;
+                tData.y_sbi2 = (vSbi != 0) ? vSbi : v_est;
+                tData.y_ebi = (vEbi != 0) ? vEbi : v_est;
+                tData.y_warning = (vWarn != 0) ? vWarn : v_est;
+                tData.y_permitted = (vPerm != 0) ? vPerm : v_est;
+                tData.y_indication = (vInd != 0) ? vInd : v_est;
             }
 
-            if (monitoring.contains("trainPosition")) {
-                QJsonObject tp = monitoring["trainPosition"].toObject();
-
-                if (tp.contains("solr_ref")) {
-                    tData.hasEoa = true;
-                    tData.dEoa = tp["solr_ref"].toObject()["d_est_front_end"].toDouble() / 100.0;
-                }
-                if (tp.contains("max_safe_front_end")) {
-                    tData.hasSvl = true;
-                    tData.dSvl = tp["max_safe_front_end"].toDouble() / 100.0;
-                }
-            }
-
-            // STRUCT DOLDU! Şimdi tek seferde paketi fırlatıyoruz.
             emit telemetryReceived(tData);
         }
     }

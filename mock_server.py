@@ -6,15 +6,21 @@ import math
 HOST = '127.0.0.1'
 PORT = 26001
 
-def generate_telemetry(distance_cm):
-    if distance_cm > 0:
-        base_speed_cms = math.sqrt(distance_cm) * 8.0
-        v_est = base_speed_cms * 0.9 
-    else:
-        base_speed_cms = 0
-        v_est = 0
+def generate_telemetry(distance_cm, cycle_count):
+    # 4000 metreden (400,000 cm) sonra frenleme eğrisi başlıyor
+    braking_start_cm = 400000.0
 
-    return {
+    if distance_cm > braking_start_cm:
+        # Görseldeki düz/tavan (Ceiling) hızı kısmı
+        base_speed_cms = math.sqrt(braking_start_cm) * 8.0 
+    else:
+        # Parabolik fren eğrisi kısmı
+        base_speed_cms = math.sqrt(distance_cm) * 8.0 if distance_cm > 0 else 0
+
+    # Trenin anlık hızı (v_est), limitlerden biraz daha düşük simüle ediliyor
+    v_est = base_speed_cms * 0.80
+
+    payload = {
         "monitoring": {
             "odometer": {
                 "v_est": int(v_est),
@@ -22,16 +28,22 @@ def generate_telemetry(distance_cm):
                 "timestamp": int(time.time())
             },
             "speedAndDistance": {
+                # Mesafeleri biraz ofsetli gönderiyoruz ki görseldeki gibi sıyrılıp insinler
                 "dEbi": int(distance_cm),
-                "vEbi": int(base_speed_cms),
-                "dSbi1": int(distance_cm - 5000),
-                "dSbi2": int(distance_cm - 10000),
-                "vSbi": int(base_speed_cms * 0.95),
-                "dWarning": int(distance_cm),
-                "vWarning": int(base_speed_cms * 0.90),
-                "dPermitted": int(distance_cm),
-                "vPermitted": int(base_speed_cms * 0.85),
-                "dIndication": int(distance_cm + 2000)
+                "vEbi": int(base_speed_cms * 1.05),
+                
+                "dSbi1": int(distance_cm - 1000),
+                "dSbi2": int(distance_cm - 2000),
+                "vSbi": int(base_speed_cms * 1.0),
+                
+                "dWarning": int(distance_cm - 3000),
+                "vWarning": int(base_speed_cms * 0.95),
+                
+                "dPermitted": int(distance_cm - 4000),
+                "vPermitted": int(base_speed_cms * 0.90),
+                
+                "dIndication": int(distance_cm - 5000),
+                "vIndication": int(base_speed_cms * 0.85) # Y Ekseni İçin Eklendi
             },
             "trainPosition": {
                 "max_safe_front_end": int(distance_cm + 5000), 
@@ -42,6 +54,9 @@ def generate_telemetry(distance_cm):
             }
         }
     }
+
+    # Fallback testini kasten devredışı bıraktım, kesintisiz o güzel eğrileri görebilmen için
+    return payload
 
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -54,9 +69,10 @@ def start_server():
             conn, addr = s.accept()
             print(f"Bağlantı sağlandı: {addr}")
             with conn:
-                distance_cm = 1000000.0 
+                distance_cm = 1000000.0 # 10 KM'den başlıyor
+                cycle_count = 1
                 while distance_cm >= 0:
-                    payload = generate_telemetry(distance_cm)
+                    payload = generate_telemetry(distance_cm, cycle_count)
                     json_string = json.dumps(payload) + "##"
                     
                     try:
@@ -66,13 +82,8 @@ def start_server():
                     except Exception as e:
                         break
                         
-                    distance_cm -= 3000.0 
-                    
-                    # YENİ EĞRİ SİMÜLASYONU: 2KM'ye gelince hedefi 8KM'ye uzat
-                    if distance_cm < 200000.0 and distance_cm > 196000.0:
-                        print(">> YENİ YETKİ (MA) GELDİ! Eğri sıfırlanıyor...")
-                        distance_cm = 800000.0 
-                    
+                    distance_cm -= 3000.0 # Hızla yaklaşıyor
+                    cycle_count += 1
                     time.sleep(0.1) 
                 print("Simülasyon bitti.")
 

@@ -3,13 +3,11 @@
 #include <QDebug>
 
 MiraController::MiraController(QObject *parent) : QObject(parent) {
-    // ÇOK ÖNEMLİ: Kendi oluşturduğumuz struct tipini Qt'ye kaydediyoruz
     qRegisterMetaType<TelemetryData>("TelemetryData");
-
     m_telemetryClient = new TelemetryClient(this);
-
-    // Tek bir sinyali bağlıyoruz
     connect(m_telemetryClient, &TelemetryClient::telemetryReceived, this, &MiraController::handleTelemetryData);
+    connect(m_telemetryClient, &TelemetryClient::telemetryReceived, this, &MiraController::printer);
+
 }
 
 void MiraController::startSystem() {
@@ -18,7 +16,6 @@ void MiraController::startSystem() {
     m_telemetryClient->connectToServer(ip, port);
 }
 
-// QML Setter Fonksiyonları...
 void MiraController::setEbiSeries(QXYSeries* series) { m_ebiSeries = series; }
 void MiraController::setPermittedSeries(QXYSeries* series) { m_permittedSeries = series; }
 void MiraController::setWarningSeries(QXYSeries* series) { m_warningSeries = series; }
@@ -39,27 +36,39 @@ void MiraController::clearAllSeries() {
     if (m_svlSeries) m_svlSeries->clear();
 }
 
-// YENİ: Struct paketi buraya düşer ve ekran güncellenir
+void MiraController::printer(TelemetryData data)
+{
+    qDebug() << "#############################################\n";
+    qDebug() << "Current Speed : " << data.v_est_kmh;
+    qDebug() << "X-SBI1 : " << data.x_sbi1 << " -- Y-SBI1 : "<<data.y_sbi1;
+    qDebug() << "X-SBI2 : " << data.x_sbi2 << " -- Y-SBI2 : "<<data.y_sbi2;
+    qDebug() << "X-EBI : " << data.x_ebi << " -- Y-EBI : "<<data.y_ebi;
+    qDebug() << "X-Warning : " << data.x_warning << " -- Y-Warning : "<<data.y_warning;
+    qDebug() << "X-Permitted : " << data.x_permitted << " -- Y-Permitted : "<<data.y_permitted;
+    qDebug() << "X-Indication : " << data.x_indication << " -- Y-Indication : "<<data.y_indication;
+    qDebug() << "\n#############################################\n";
+}
+
 void MiraController::handleTelemetryData(TelemetryData data) {
+    // QML Arayüz Güncellemesi
+    m_currentSpeedText = QString::number(data.v_est_kmh, 'f', 0) + " km/h";
+    m_currentLevelText = data.currentLevel;
+    emit uiDataChanged();
 
     if (data.hasCurves) {
-        // Yeni Yetki (Movement Authority) Sıfırlama Kontrolü
-        if (m_lastDistanceToTarget != -1.0 && data.dEbi > (m_lastDistanceToTarget + 10.0)) {
-            qDebug() << "Grafik Sifirlaniyor! Mesafe sictamasi:" << m_lastDistanceToTarget << "->\n" << data.dEbi;
+        if (m_lastDistanceToTarget != -1.0 && data.x_ebi > (m_lastDistanceToTarget + 10.0)) {
             clearAllSeries();
         }
-        m_lastDistanceToTarget = data.dEbi;
+        m_lastDistanceToTarget = data.x_ebi;
 
-        // Eğrileri struct'tan okuyup grafiğe ekliyoruz
-        if (m_ebiSeries) m_ebiSeries->append(data.dEbi, data.vEbi);
-        if (m_permittedSeries) m_permittedSeries->append(data.dPermitted, data.vPermitted);
-        if (m_warningSeries) m_warningSeries->append(data.dWarning, data.vWarning);
-        if (m_sbi1Series) m_sbi1Series->append(data.dSbi1, data.vSbi);
-        if (m_sbi2Series) m_sbi2Series->append(data.dSbi2, data.vSbi);
-        if (m_indicationSeries) m_indicationSeries->append(data.dIndication, data.v_est_kmh); // Y ekseni olarak v_est kullanıyoruz
+        if (m_ebiSeries) m_ebiSeries->append(data.x_ebi, data.y_ebi);
+        if (m_permittedSeries) m_permittedSeries->append(data.x_permitted, data.y_permitted);
+        if (m_warningSeries) m_warningSeries->append(data.x_warning, data.y_warning);
+        if (m_sbi1Series) m_sbi1Series->append(data.x_sbi1, data.y_sbi1);
+        if (m_sbi2Series) m_sbi2Series->append(data.x_sbi2, data.y_sbi2);
+        if (m_indicationSeries) m_indicationSeries->append(data.x_indication, data.y_indication);
     }
 
-    // Hedef noktalarını struct'tan okuyup grafiğe ekliyoruz
     if (data.hasEoa && m_eoaSeries) m_eoaSeries->append(data.dEoa, data.v_est_kmh);
     if (data.hasSvl && m_svlSeries) m_svlSeries->append(data.dSvl, data.v_est_kmh);
 }
