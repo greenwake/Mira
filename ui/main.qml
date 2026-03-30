@@ -16,11 +16,9 @@ Window {
         MiraController.setEbiSeries(ebiLine);
         MiraController.setPermittedSeries(permittedLine);
         MiraController.setWarningSeries(warningLine);
-        MiraController.setSbi1Series(sbi1Line);
+        //MiraController.setSbi1Series(sbi1Line);
         MiraController.setSbi2Series(sbi2Line);
         MiraController.setIndicationSeries(indicationLine);
-        //MiraController.setEoaSeries(eoaSeries);
-        //MiraController.setSvlSeries(svlSeries);
         MiraController.startSystem();
     }
 
@@ -58,196 +56,356 @@ Window {
             }
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: "#2d2d2d"
-            radius: 10
-
-            ChartView {
-                anchors.fill: parent
-                anchors.margins: 10
-                title: "Hız - Mesafe Eğrisi"
-                titleColor: "white"
-                backgroundColor: "transparent"
-                legend.labelColor: "white"
-                antialiasing: true
-
-                ValueAxis {
-                    id: axisX
-                    min: 0
-                    max: 12000
-                    titleText: "<font color='white'>Distance from target (m)</font>"
-                    labelsColor: "white"
-                    reverse: true
-                }
-
-                ValueAxis {
-                    id: axisY
-                    min: 0
-                    max: 250
-                    titleText: "<font color='white'>Speed (km/h)</font>"
-                    labelsColor: "white"
-                }
-
-                LineSeries {
-                    id: ebiLine
-                    name: "EBI"
-                    axisX: axisX; axisY: axisY
-                    color: "#00008B"
-                    width: 3
-                }
-                LineSeries {
-                    id: sbi1Line
-                    name: "SBI 1"
-                    axisX: axisX; axisY: axisY
-                    color: "#32CD32"
-                    style: Qt.DashLine
-                    width: 2
-                }
-                LineSeries {
-                    id: sbi2Line
-                    name: "SBI 2"
-                    axisX: axisX; axisY: axisY
-                    color: "#4169E1"
-                    style: Qt.DashLine
-                    width: 2
-                }
-                LineSeries {
-                    id: warningLine
-                    name: "Warning"
-                    axisX: axisX; axisY: axisY
-                    color: "#FFA500" // Turuncu
-                    width: 3
-                }
-                LineSeries {
-                    id: permittedLine
-                    name: "Permitted"
-                    axisX: axisX; axisY: axisY
-                    color: "#A9A9A9"
-                    width: 3
-                }
-                LineSeries {
-                    id: indicationLine
-                    name: "Indication"
-                    axisX: axisX; axisY: axisY
-                    color: "#FFFF00" // Sarı
-                    width: 3
-                }
-
-                //ScatterSeries {
-                //    id: eoaSeries
-                //    name: "EOA Target"
-                //    axisX: axisX; axisY: axisY
-                //    color: "#FF0000"
-                //    markerSize: 5
-                //}
-                //ScatterSeries {
-                //    id: svlSeries
-                //    name: "SVL Target"
-                //    axisX: axisX; axisY: axisY
-                //    color: "#FFA500"
-                //    markerSize: 5
-                //}
-            }
-        }
-
+        // --- 2. ORTA BÖLÜM (GRAFİK VE SAĞ MENÜ) ---
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 60
-            spacing: 20
+            Layout.fillHeight: true
+            spacing: 15
 
-            RowLayout {
-                spacing: 15
-                Text {
-                    text: "Eğri Filtreleri:"
-                    color: "white"
-                    font.pixelSize: 16
-                    font.bold: true
-                }
-                CheckBox {
-                    text: "EBI"
-                    checked: true
-                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                    onCheckedChanged: ebiLine.visible = checked
-                }
-                CheckBox {
-                    text: "SBI 1"
-                    checked: true
-                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                    onCheckedChanged: sbi1Line.visible = checked
-                }
-                CheckBox {
-                    text: "SBI 2"
-                    checked: true
-                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                    onCheckedChanged: sbi2Line.visible = checked
-                }
-                CheckBox {
-                    text: "Warning"
-                    checked: true
-                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                    onCheckedChanged: warningLine.visible = checked
-                }
-                CheckBox {
-                    text: "Permitted"
-                    checked: true
-                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                    onCheckedChanged: permittedLine.visible = checked
-                }
-                CheckBox {
-                    text: "Indication"
-                    checked: true
-                    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                    onCheckedChanged: indicationLine.visible = checked
-                }
-                //CheckBox {
-                //    text: "EOA"
-                //    checked: true
-                //    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                //    onCheckedChanged: eoaSeries.visible = checked
-                //}
-                //CheckBox {
-                //    text: "SVL"
-                //    checked: true
-                //    contentItem: Text { text: parent.text; color: "white"; font.pixelSize: 16 }
-                //    onCheckedChanged: svlSeries.visible = checked
-                //}
-            }
-
-            Item {
+            // 2A. GRAFİK ALANI (SOL VE ORTA)
+            Rectangle {
                 Layout.fillWidth: true
+                Layout.fillHeight: true
+                color: "#2d2d2d"
+                radius: 10
+
+                ChartView {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    title: "Speed - Distance Curve"
+                    titleColor: "white"
+                    titleFont.pixelSize: 20  // Başlık font boyutu
+                    titleFont.bold: true     // İsteğe bağlı kalınlaştırma
+                    backgroundColor: "transparent"
+                    legend.labelColor: "white"
+                    antialiasing: true
+
+                    ValueAxis {
+                        id: axisX
+                        min: 0
+                        max: MiraController.distanceRange
+                        titleText: "<font color='white'>Distance from target (m)</font>"
+                        labelsColor: "white"
+                        reverse: true
+                    }
+
+                    ValueAxis {
+                        id: axisY
+                        min: 0
+                        max: MiraController.speedRange + 20
+                        titleText: "<font color='white'>Speed (km/h)</font>"
+                        labelsColor: "white"
+                    }
+
+                    LineSeries {
+                        id: ebiLine
+                        name: "EBI"
+                        axisX: axisX; axisY: axisY
+                        color: "#00008B"
+                        width: 3
+                    }
+                    //LineSeries {
+                    //    id: sbi1Line
+                    //    name: "SBI 1"
+                    //    axisX: axisX; axisY: axisY
+                    //    color: "#32CD32"
+                    //    style: Qt.DashLine
+                    //    width: 2
+                    //}
+                    LineSeries {
+                        id: sbi2Line
+                        name: "SBI"
+                        axisX: axisX; axisY: axisY
+                        color: "#4169E1"
+                        style: Qt.DashLine
+                        width: 2
+                    }
+                    LineSeries {
+                        id: warningLine
+                        name: "Warning"
+                        axisX: axisX; axisY: axisY
+                        color: "#FFA500" // Turuncu
+                        width: 3
+                    }
+                    LineSeries {
+                        id: permittedLine
+                        name: "Permitted"
+                        axisX: axisX; axisY: axisY
+                        color: "#A9A9A9"
+                        width: 3
+                    }
+                    LineSeries {
+                        id: indicationLine
+                        name: "Indication"
+                        axisX: axisX; axisY: axisY
+                        color: "#FFFF00" // Sarı
+                        width: 3
+                    }
+
+                    //ScatterSeries {
+                    //    id: eoaSeries
+                    //    name: "EOA Target"
+                    //    axisX: axisX; axisY: axisY
+                    //    color: "#FF0000"
+                    //    markerSize: 5
+                    //}
+                    //ScatterSeries {
+                    //    id: svlSeries
+                    //    name: "SVL Target"
+                    //    axisX: axisX; axisY: axisY
+                    //    color: "#FFA500"
+                    //    markerSize: 5
+                    //}
+                }
             }
 
-            RowLayout {
-                spacing: 15
+            // 2B. SAĞ MENÜ (BİLGİ PANELLERİ VE FİLTRELER)
+            Rectangle {
+                Layout.preferredWidth: 240
+                Layout.fillHeight: true
+                color: "#2d2d2d"
+                radius: 10
 
-                Rectangle {
-                    implicitWidth: 160; implicitHeight: 50
-                    color: "#3d3d3d"; radius: 8
-                    RowLayout {
-                        anchors.fill: parent; anchors.margins: 10
-                        Text { text: "Hız:"; color: "#aaaaaa"; font.pixelSize: 16 }
-                        Text { text: MiraController.currentSpeedText; color: "#00ffcc"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 15
+
+                    // --- BİLGİ PANELLERİ ---
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 60
+                        color: "#3d3d3d"; radius: 8
+                        RowLayout {
+                            anchors.fill: parent; anchors.margins: 10
+                            Text { text: "Train Max\nSpeed:"; color: "#aaaaaa"; font.pixelSize: 16 }
+                            Text { text: MiraController.trainMaxSpeedText; color: "#00ffcc"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                        }
                     }
-                }
-                Rectangle {
-                    implicitWidth: 160; implicitHeight: 50
-                    color: "#3d3d3d"; radius: 8
-                    RowLayout {
-                        anchors.fill: parent; anchors.margins: 10
-                        Text { text: "Mod:"; color: "#aaaaaa"; font.pixelSize: 16 }
-                        Text { text: "Shunting"; color: "#ffcc00"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 50
+                        color: "#3d3d3d"; radius: 8
+                        RowLayout {
+                            anchors.fill: parent; anchors.margins: 10
+                            Text { text: "Speed:"; color: "#aaaaaa"; font.pixelSize: 16 }
+                            Text { text: MiraController.currentSpeedText; color: "#00ffcc"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                        }
                     }
-                }
-                Rectangle {
-                    implicitWidth: 160; implicitHeight: 50
-                    color: "#3d3d3d"; radius: 8
-                    RowLayout {
-                        anchors.fill: parent; anchors.margins: 10
-                        Text { text: "Level:"; color: "#aaaaaa"; font.pixelSize: 16 }
-                        Text { text: MiraController.currentLevelText; color: "#ff99aa"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 60
+                        color: "#3d3d3d"; radius: 8
+                        RowLayout {
+                            anchors.fill: parent; anchors.margins: 10
+                            Text { text: "Mod:"; color: "#aaaaaa"; font.pixelSize: 16 }
+                            Text { text: MiraController.currentModeText; color: "#ffcc00"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                        }
                     }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 50
+                        color: "#3d3d3d"; radius: 8
+                        RowLayout {
+                            anchors.fill: parent; anchors.margins: 10
+                            Text { text: "Level:"; color: "#aaaaaa"; font.pixelSize: 16 }
+                            Text { text: MiraController.currentLevelText; color: "#ff99aa"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                        }
+                    }
+
+                    // (Divider)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 2
+                        color: "#444444"
+                        Layout.topMargin: 10
+                        Layout.bottomMargin: 10
+                    }
+
+                    // --- FİLTRELER ---
+                    Text {
+                        text: "Filters:"
+                        color: "white"
+                        font.pixelSize: 18
+                        font.bold: true
+                        Layout.bottomMargin: 5
+                    }
+
+                    CheckBox {
+                        text: "EBI"
+                        checked: true
+                        font.pixelSize: 16
+                        palette.windowText: "white"
+                        onCheckedChanged: ebiLine.visible = checked
+                    }
+                    // CheckBox {
+                        // text: "SBI 1"
+                        // checked: true
+                        // font.pixelSize: 16
+                        // palette.windowText: "white"
+                        // onCheckedChanged: sbi1Line.visible = checked
+                    // }
+                    CheckBox {
+                        text: "SBI"
+                        checked: true
+                        font.pixelSize: 16
+                        palette.windowText: "white"
+                        onCheckedChanged: sbi2Line.visible = checked
+                    }
+                    CheckBox {
+                        text: "Warning"
+                        checked: true
+                        font.pixelSize: 16
+                        palette.windowText: "white"
+                        onCheckedChanged: warningLine.visible = checked
+                    }
+                    CheckBox {
+                        text: "Permitted"
+                        checked: true
+                        font.pixelSize: 16
+                        palette.windowText: "white"
+                        onCheckedChanged: permittedLine.visible = checked
+                    }
+                    CheckBox {
+                        text: "Indication"
+                        checked: true
+                        font.pixelSize: 16
+                        palette.windowText: "white"
+                        onCheckedChanged: indicationLine.visible = checked
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 2
+                        color: "#444444"
+                        Layout.topMargin: 10
+                        Layout.bottomMargin: 10
+                    }
+
+                    Button {
+                        text: "Clear"
+                        font.pixelSize: 16
+                        font.bold: true
+                        implicitWidth: 200
+                        implicitHeight: 50
+                        background: Rectangle {
+                            color: parent.down ? "#0055cc" : "#0077ff"
+                            radius: 5
+                        }
+                        contentItem: Text {
+                            text: parent.text
+                            color: "white"
+                            font.pixelSize: 20
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        onClicked: MiraController.clearAllSeries();
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 10 // Clear butonu ile araya mesafe
+                        spacing: 10
+
+                        // +500 Butonu
+                        Button {
+                            text: "+500"
+                            font.pixelSize: 16
+                            font.bold: true
+                            Layout.fillWidth: true // Alanı kaplaması için
+                            implicitHeight: 50
+                            background: Rectangle {
+                                color: parent.down ? "#006600" : "#008000" // Yeşil tonları
+                                radius: 5
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            // Önerilen Fonksiyon İsmi
+                            onClicked: MiraController.increaseRange500();
+                        }
+
+                        // -500 Butonu
+                        Button {
+                            text: "-500"
+                            font.pixelSize: 16
+                            font.bold: true
+                            Layout.fillWidth: true // Alanı kaplaması için
+                            implicitHeight: 50
+                            background: Rectangle {
+                                color: parent.down ? "#cc6600" : "#e67e22" // Turuncu tonları
+                                radius: 5
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            // Önerilen Fonksiyon İsmi
+                            onClicked: MiraController.decreaseRange500();
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.topMargin: 10
+                        spacing: 10
+
+                        // +500 Butonu
+                        Button {
+                            text: "+50"
+                            font.pixelSize: 16
+                            font.bold: true
+                            Layout.fillWidth: true // Alanı kaplaması için
+                            implicitHeight: 50
+                            background: Rectangle {
+                                color: parent.down ? "#006600" : "#008000" // Yeşil tonları
+                                radius: 5
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            // Önerilen Fonksiyon İsmi
+                            onClicked: MiraController.increaseRange50();
+                        }
+
+                        // -500 Butonu
+                        Button {
+                            text: "-50"
+                            font.pixelSize: 16
+                            font.bold: true
+                            Layout.fillWidth: true // Alanı kaplaması için
+                            implicitHeight: 50
+                            background: Rectangle {
+                                color: parent.down ? "#cc6600" : "#e67e22" // Turuncu tonları
+                                radius: 5
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: "white"
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            // Önerilen Fonksiyon İsmi
+                            onClicked: MiraController.decreaseRange50();
+                        }
+                    }
+
+
+
+
+
+
+
+
+                    // Seçenekleri yukarı itmek için boşluğu alta ekledik
+                    Item { Layout.fillHeight: true }
                 }
             }
         }

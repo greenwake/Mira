@@ -34,41 +34,78 @@ void MiraController::clearAllSeries() {
     if (m_indicationSeries) m_indicationSeries->clear();
     if (m_eoaSeries) m_eoaSeries->clear();
     if (m_svlSeries) m_svlSeries->clear();
+
 }
 
-void MiraController::printer(TelemetryData data)
+void MiraController::increaseRange500()
+{
+    m_distanceRange = m_distanceRange + 500;
+    emit uiDataChanged();
+}
+
+void MiraController::increaseRange50()
+{
+    m_speedRange = m_speedRange + 50;
+    // m_trainMaxSpeed = m_speedRange;
+    emit uiDataChanged();
+}
+
+void MiraController::decreaseRange500()
+{
+    m_distanceRange = (m_distanceRange - 500 >=1000) ? (m_distanceRange - 500) : 1000.0;
+    emit uiDataChanged();
+}
+
+void MiraController::decreaseRange50()
+{
+    m_speedRange = (m_speedRange - 50 >=m_trainMaxSpeed) ? (m_speedRange - 50) : m_trainMaxSpeed;
+    // m_trainMaxSpeed = m_speedRange;
+    emit uiDataChanged();
+}
+
+void MiraController::printer(TelemetryData *Data)
 {
     qDebug() << "#############################################\n";
-    qDebug() << "Current Speed : " << data.v_est_kmh;
-    qDebug() << "X-SBI1 : " << data.x_sbi1 << " -- Y-SBI1 : "<<data.y_sbi1;
-    qDebug() << "X-SBI2 : " << data.x_sbi2 << " -- Y-SBI2 : "<<data.y_sbi2;
-    qDebug() << "X-EBI : " << data.x_ebi << " -- Y-EBI : "<<data.y_ebi;
-    qDebug() << "X-Warning : " << data.x_warning << " -- Y-Warning : "<<data.y_warning;
-    qDebug() << "X-Permitted : " << data.x_permitted << " -- Y-Permitted : "<<data.y_permitted;
-    qDebug() << "X-Indication : " << data.x_indication << " -- Y-Indication : "<<data.y_indication;
+    qDebug() << "Current Speed : " << Data->v_est_kmh;
+    qDebug() << "X-SBI1 : " << Data->x_sbi1 << " -- Y-SBI1 : "<<Data->y_sbi1;
+    qDebug() << "X-SBI2 : " << Data->x_sbi2 << " -- Y-SBI2 : "<<Data->y_sbi2;
+    qDebug() << "X-EBI : " << Data->x_ebi << " -- Y-EBI : "<<Data->y_ebi;
+    qDebug() << "X-Warning : " << Data->x_warning << " -- Y-Warning : "<<Data->y_warning;
+    qDebug() << "X-Permitted : " << Data->x_permitted << " -- Y-Permitted : "<<Data->y_permitted;
+    qDebug() << "X-Indication : " << Data->x_indication << " -- Y-Indication : "<<Data->y_indication;
     qDebug() << "\n#############################################\n";
 }
 
-void MiraController::handleTelemetryData(TelemetryData data) {
+
+void MiraController::handleTelemetryData(TelemetryData *tData) {
     // QML Arayüz Güncellemesi
-    m_currentSpeedText = QString::number(data.v_est_kmh, 'f', 0) + " km/h";
-    m_currentLevelText = data.currentLevel;
+    /*if(tData->v_est_kmh != 0.0) */
+    m_currentSpeedText = QString::number(tData->v_est_kmh, 'f', 0) + " km/h";
+
+    m_trainMaxSpeedText = QString::number(tData->trainMaxSpeed, 'f', 0) + " km/h";
+    m_trainMaxSpeed = tData->trainMaxSpeed;
+    // m_distanceRange = tData->default_distance;
+
+    m_currentLevelText = tData->currentLevelText;
+
+    qDebug() << "m_currentModeText : " << tData->currentModeText;
+    m_currentModeText = tData->currentModeText;
     emit uiDataChanged();
 
-    if (data.hasCurves) {
-        if (m_lastDistanceToTarget != -1.0 && data.x_ebi > (m_lastDistanceToTarget + 10.0)) {
-            clearAllSeries();
-        }
-        m_lastDistanceToTarget = data.x_ebi;
+    if (tData->hasCurves) {
+        m_lastDistanceToTarget = tData->x_ebi;
 
-        if (m_ebiSeries) m_ebiSeries->append(data.x_ebi, data.y_ebi);
-        if (m_permittedSeries) m_permittedSeries->append(data.x_permitted, data.y_permitted);
-        if (m_warningSeries) m_warningSeries->append(data.x_warning, data.y_warning);
-        if (m_sbi1Series) m_sbi1Series->append(data.x_sbi1, data.y_sbi1);
-        if (m_sbi2Series) m_sbi2Series->append(data.x_sbi2, data.y_sbi2);
-        if (m_indicationSeries) m_indicationSeries->append(data.x_indication, data.y_indication);
+        if (m_ebiSeries) m_ebiSeries->append(tData->x_ebi, tData->y_ebi);
+        if (m_permittedSeries) m_permittedSeries->append(tData->x_permitted, tData->y_permitted);
+        if (m_warningSeries) m_warningSeries->append(tData->x_warning, tData->y_warning);
+        if (m_sbi1Series) m_sbi1Series->append(tData->x_sbi1, tData->y_sbi1);
+        if (m_sbi2Series) m_sbi2Series->append(tData->x_sbi2, tData->y_sbi2);
+        if(tData->monitoringStatus){
+            if (m_indicationSeries) m_indicationSeries->append(tData->x_indication, tData->y_indication);
+        }
+
     }
 
-    if (data.hasEoa && m_eoaSeries) m_eoaSeries->append(data.dEoa, data.v_est_kmh);
-    if (data.hasSvl && m_svlSeries) m_svlSeries->append(data.dSvl, data.v_est_kmh);
+    if (tData->hasEoa && m_eoaSeries) m_eoaSeries->append(tData->dEoa, tData->v_est_kmh);
+    if (tData->hasSvl && m_svlSeries) m_svlSeries->append(tData->dSvl, tData->v_est_kmh);
 }
