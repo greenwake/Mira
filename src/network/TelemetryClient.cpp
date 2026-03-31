@@ -27,11 +27,6 @@ void TelemetryClient::attemptReconnect() {
     }
 }
 
-void TelemetryClient::printer()
-{
-
-}
-
 void TelemetryClient::onConnected() {
     qDebug() << "Sunucuya basariyla baglanildi!";
     m_reconnectTimer->stop();
@@ -81,7 +76,10 @@ QString TelemetryClient::getLevelName(int lvl)
 }
 
 void TelemetryClient::onReadyRead() {
-    m_buffer.append(m_socket->readAll());
+
+    QByteArray newData = m_socket->readAll();
+    emit rawDataReceived(newData);
+    m_buffer.append(newData);
 
     while (m_buffer.contains("##")) {
         int separatorIndex = m_buffer.indexOf("##");
@@ -145,7 +143,6 @@ void TelemetryClient::onReadyRead() {
 
                 tData->monitoringStatus = monitoringStatus;
 
-                // Lambda fonksiyonlarından çevrimler kaldırıldı. Gelen veri doğrudan double olarak alınıyor.
                 auto getD = [&](const QString& k) { return sAndD.contains(k) ? sAndD[k].toDouble() : 0.0; };
                 auto getV = [&](const QString& k) { return sAndD.contains(k) ? sAndD[k].toDouble() : 0.0; };
 
@@ -155,7 +152,7 @@ void TelemetryClient::onReadyRead() {
                 double vSbi = getV("vSbi"), vEbi = getV("vEbi"), vWarn = getV("vWarning"), vPerm = getV("vPermitted");
                 double vInd = getV("vIndication");
 
-                // X Ekseni Yedekleme Mantıkları (Fallback)
+                // X Ekseni
                 tData->x_sbi1 = (dSbi1 != 0) ? maDistance-dSbi1 : ((solr_d != 0) ? solr_d : (tData->default_distance - distanceSinceStart));
                 tData->x_sbi2 = (dSbi2 != 0) ? maDistance-dSbi2 : (tData->default_distance - distanceSinceStart);
                 tData->x_ebi = (dEbi != 0) ? maDistance-dEbi : ((tData->default_distance - distanceSinceStart));

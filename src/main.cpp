@@ -1,7 +1,6 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-// QQuickStyle kütüphanesini sildik
 #include "MiraController.h"
 #include "ConfigManager.h"
 

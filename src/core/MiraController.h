@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QtCharts/QXYSeries>
 #include "../network/TelemetryClient.h"
+#include "../network/TelemetryServer.h"
 
 class MiraController : public QObject {
     Q_OBJECT
@@ -48,6 +49,7 @@ private slots:
 
 private:
     TelemetryClient* m_telemetryClient;
+    TelemetryServer* m_telemetryServer;
     double m_lastDistanceToTarget = -1.0;
 
     QString m_currentSpeedText = "0 km/h";

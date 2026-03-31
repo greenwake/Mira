@@ -1,5 +1,6 @@
 #pragma once
 #include <QObject>
+#include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
 #include <QMetaType>
@@ -69,9 +70,11 @@ class TelemetryClient : public QObject {
 public:
     explicit TelemetryClient(QObject *parent = nullptr);
     void connectToServer(const QString& ip, quint16 port);
+    void broadcastData(const QByteArray &data);
 
 signals:
     void telemetryReceived(TelemetryData *data);
+    void rawDataReceived(const QByteArray &data);
 
 private slots:
     QString getModeName(int mode);
@@ -81,10 +84,10 @@ private slots:
     void onDisconnected();
     void onErrorOccurred(QAbstractSocket::SocketError socketError);
     void attemptReconnect();
-    void printer();
-
 
 private:
+    QTcpServer *m_server;
+    QList<QTcpSocket*> m_clients;
     QTcpSocket* m_socket;
     TelemetryData *tData;
     QByteArray m_buffer;

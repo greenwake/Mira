@@ -11,14 +11,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Quick Network Charts Widgets)
 
-# --- HEADER (INCLUDE) YOLLARI ---
+# --- HEADER (INCLUDE) ---
 include_directories(
     src/core
     src/network
     src/config
 )
 
-# --- KAYNAK DOSYALAR ---
 set(PROJECT_SOURCES
     src/main.cpp
 
@@ -29,6 +28,8 @@ set(PROJECT_SOURCES
     # Network
     src/network/TelemetryClient.h
     src/network/TelemetryClient.cpp
+    src/network/TelemetryServer.h
+    src/network/TelemetryServer.cpp
 
     # Config
     src/config/ConfigManager.h
@@ -52,9 +53,11 @@ qt_add_qml_module(MiraApp
     VERSION 1.0
     QML_FILES ui/main.qml
     SOURCES src/core/MiraController.h src/core/MiraController.cpp
+    SOURCES
+    SOURCES src/network/TelemetryServer.h src/network/TelemetryServer.cpp
 )
 
-# Config dosyasını kopyala
+# Config
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/mira_config.ini DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 if(QT_VERSION_MAJOR EQUAL 6)

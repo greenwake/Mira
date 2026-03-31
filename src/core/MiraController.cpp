@@ -5,6 +5,13 @@
 MiraController::MiraController(QObject *parent) : QObject(parent) {
     qRegisterMetaType<TelemetryData>("TelemetryData");
     m_telemetryClient = new TelemetryClient(this);
+
+    m_telemetryServer = new TelemetryServer(9586, this);
+
+    connect(m_telemetryClient, &TelemetryClient::rawDataReceived,
+            m_telemetryServer, &TelemetryServer::broadcastData);
+
+
     connect(m_telemetryClient, &TelemetryClient::telemetryReceived, this, &MiraController::handleTelemetryData);
     connect(m_telemetryClient, &TelemetryClient::telemetryReceived, this, &MiraController::printer);
 
@@ -46,7 +53,6 @@ void MiraController::increaseRange500()
 void MiraController::increaseRange50()
 {
     m_speedRange = m_speedRange + 50;
-    // m_trainMaxSpeed = m_speedRange;
     emit uiDataChanged();
 }
 
@@ -58,8 +64,7 @@ void MiraController::decreaseRange500()
 
 void MiraController::decreaseRange50()
 {
-    m_speedRange = (m_speedRange - 50 >=m_trainMaxSpeed) ? (m_speedRange - 50) : m_trainMaxSpeed;
-    // m_trainMaxSpeed = m_speedRange;
+    m_speedRange = (m_speedRange - 50 >=50) ? (m_speedRange - 50) : 50;
     emit uiDataChanged();
 }
 
@@ -78,13 +83,11 @@ void MiraController::printer(TelemetryData *Data)
 
 
 void MiraController::handleTelemetryData(TelemetryData *tData) {
-    // QML Arayüz Güncellemesi
-    /*if(tData->v_est_kmh != 0.0) */
+
     m_currentSpeedText = QString::number(tData->v_est_kmh, 'f', 0) + " km/h";
 
     m_trainMaxSpeedText = QString::number(tData->trainMaxSpeed, 'f', 0) + " km/h";
     m_trainMaxSpeed = tData->trainMaxSpeed;
-    // m_distanceRange = tData->default_distance;
 
     m_currentLevelText = tData->currentLevelText;
 
